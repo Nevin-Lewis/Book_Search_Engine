@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import {useQuery, useMutation} from '@apollo/client';
+import {QUERY_ME} from '../utils/queries';
+import { REMOVE_BOOK } from '../utils/mutations';
 import {
   Container,
   Card,
@@ -6,19 +9,18 @@ import {
   Row,
   Col
 } from 'react-bootstrap';
-
-import { getMe, deleteBook } from '../utils/API';
 import Auth from '../utils/auth';
 import { removeBookId } from '../utils/localStorage';
+import { useParams, Navigate } from 'react-router-dom';
 
 const SavedBooks = () => {
   const [userData, setUserData] = useState({});
 
   // use this to determine if `useEffect()` hook needs to run again
-  const userDataLength = Object.keys(userData).length;
+  // const userDataLength = Object.keys(userData).length;
+const getUserData = async () => {
+  const {username: userParam} = useParams();
 
-  useEffect(() => {
-    const getUserData = async () => {
       try {
         const token = Auth.loggedIn() ? Auth.getToken() : null;
 
@@ -26,7 +28,9 @@ const SavedBooks = () => {
           return false;
         }
 
-        const response = await getMe(token);
+        const {response} = useQuery(QUERY_ME, {
+          variables: { username: userParam},
+        });
 
         if (!response.ok) {
           throw new Error('something went wrong!');
@@ -40,10 +44,11 @@ const SavedBooks = () => {
     };
 
     getUserData();
-  }, [userDataLength]);
+
 
   // create function that accepts the book's mongo _id value as param and deletes the book from the database
   const handleDeleteBook = async (bookId) => {
+  
     const token = Auth.loggedIn() ? Auth.getToken() : null;
 
     if (!token) {
@@ -51,23 +56,26 @@ const SavedBooks = () => {
     }
 
     try {
-      const response = await deleteBook(bookId, token);
+    const {data} = useMutation(REMOVE_BOOK,{
+      variables: {bookId},
+     });
+      
 
-      if (!response.ok) {
+      if (!data.ok) {
         throw new Error('something went wrong!');
       }
 
-      const updatedUser = await response.json();
+      const updatedUser = await data.json();
       setUserData(updatedUser);
       // upon success, remove book's id from localStorage
       removeBookId(bookId);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   };
 
   // if data isn't here yet, say so
-  if (!userDataLength) {
+  if (!userData) {
     return <h2>LOADING...</h2>;
   }
 
